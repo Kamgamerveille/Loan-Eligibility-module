@@ -156,3 +156,47 @@ if submitted:
     except Exception as exc:
         logger.exception("Prediction failed.")
         st.error(f"Prediction failed: {exc}")
+        
+# --------------------------------------------------
+# MODEL VISUALIZATIONS
+# --------------------------------------------------
+
+st.divider()
+
+st.subheader("📊 Model Visualizations")
+
+st.write(
+    "These visualizations show the performance of the "
+    "Real Estate prediction model."
+)
+
+# Feature Importance
+st.markdown("### Feature Importance")
+
+try:
+    st.image(
+        "feature_importance.png",
+        caption="Random Forest Feature Importance",
+        use_container_width=True,
+    )
+except Exception:
+    st.info(
+        "Feature importance chart is not available. "
+        "Run `python main.py` to generate it."
+    )
+
+
+# Actual vs Predicted
+st.markdown("### Actual vs Predicted Prices")
+
+try:
+    st.image(
+        "actual_vs_predicted.png",
+        caption="Actual vs Predicted Property Prices",
+        use_container_width=True,
+    )
+except Exception:
+    st.info(
+        "Actual vs Predicted chart is not available. "
+        "Run `python main.py` to generate it."
+    )
