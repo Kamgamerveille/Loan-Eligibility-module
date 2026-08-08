@@ -1,202 +1,299 @@
 import logging
 
-import pandas as pd
 import streamlit as st
 
-from src.features.build_features import FEATURE_COLUMNS
 from src.models.predict_model import (
-    load_model,
-    predict_property_price,
+    load_prediction_files,
+    prepare_user_input,
+    predict_loan,
 )
+
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format=(
+        "%(asctime)s - %(levelname)s - "
+        "%(message)s"
+    ),
 )
+
 
 logger = logging.getLogger(__name__)
 
+
 st.set_page_config(
-    page_title="Real Estate Price Predictor",
-    page_icon="🏠",
+    page_title="Loan Eligibility Predictor",
+    page_icon="💳",
     layout="centered",
 )
 
-st.title("🏠 Real Estate Price Predictor")
+
+st.title(
+    "💳 Loan Eligibility Predictor"
+)
 
 st.write(
-    "Enter the property details below to estimate the selling price."
+    """
+    Enter the applicant's information below
+    to predict loan eligibility.
+    """
 )
 
 
 @st.cache_resource
-def get_model():
-    return load_model("models/RealEstateModel.pkl")
+def load_files():
+
+    return load_prediction_files()
 
 
 try:
-    model = get_model()
+
+    model, scaler, model_columns = (
+        load_files()
+    )
 
 except Exception as exc:
-    st.error("The model could not be loaded. Run `python main.py` first.")
-    logger.exception("Model loading failed.")
+
+    st.error(
+        "The trained model could not be loaded. "
+        "Run `python main.py` first."
+    )
+
+    logger.exception(
+        "Model loading failed."
+    )
+
     st.stop()
 
 
-with st.form("property_form"):
+with st.form(
+    "loan_form"
+):
 
-    st.subheader("Property Information")
-
-    beds = st.number_input(
-        "Bedrooms",
-        min_value=1,
-        max_value=10,
-        value=3,
-        step=1,
+    st.subheader(
+        "Applicant Information"
     )
 
-    baths = st.number_input(
-        "Bathrooms",
-        min_value=1.0,
-        max_value=10.0,
-        value=2.0,
-        step=0.5,
+    gender = st.selectbox(
+        "Gender",
+        [
+            "Male",
+            "Female",
+        ],
     )
 
-    sqft = st.number_input(
-        "Square Footage",
-        min_value=200.0,
-        value=1500.0,
-        step=100.0,
+    married = st.selectbox(
+        "Married",
+        [
+            "No",
+            "Yes",
+        ],
     )
 
-    year_built = st.number_input(
-        "Year Built",
-        min_value=1900,
-        max_value=2026,
-        value=2000,
-        step=1,
+    dependents = st.selectbox(
+        "Dependents",
+        [
+            "0",
+            "1",
+            "2",
+            "3+",
+        ],
     )
 
-    property_type = st.selectbox(
-        "Property Type",
-        ["House / Other", "Condo"],
+    education = st.selectbox(
+        "Education",
+        [
+            "Graduate",
+            "Not Graduate",
+        ],
     )
 
-    basement = st.selectbox(
-        "Basement",
-        ["No", "Yes"],
+    self_employed = st.selectbox(
+        "Self Employed",
+        [
+            "No",
+            "Yes",
+        ],
     )
 
-    st.subheader("Additional Information")
-
-    property_tax = st.number_input(
-        "Property Tax",
+    applicant_income = st.number_input(
+        "Applicant Income",
         min_value=0.0,
-        value=250.0,
-        step=25.0,
+        value=5000.0,
+        step=500.0,
     )
 
-    insurance = st.number_input(
-        "Insurance",
+    coapplicant_income = st.number_input(
+        "Co-applicant Income",
         min_value=0.0,
-        value=100.0,
+        value=0.0,
+        step=500.0,
+    )
+
+    loan_amount = st.number_input(
+        "Loan Amount",
+        min_value=0.0,
+        value=150.0,
         step=10.0,
     )
 
-    submitted = st.form_submit_button("Predict Price")
+    loan_term = st.selectbox(
+        "Loan Term",
+        [
+            360.0,
+            180.0,
+            120.0,
+            84.0,
+            60.0,
+            36.0,
+            12.0,
+        ],
+    )
+
+    credit_history = st.selectbox(
+        "Credit History",
+        options=[
+            1.0,
+            0.0,
+        ],
+        format_func=lambda x:
+            "Good Credit History"
+            if x == 1.0
+            else "Poor Credit History",
+    )
+
+    property_area = st.selectbox(
+        "Property Area",
+        [
+            "Urban",
+            "Semiurban",
+            "Rural",
+        ],
+    )
+
+    submitted = (
+        st.form_submit_button(
+            "Check Loan Eligibility"
+        )
+    )
 
 
 if submitted:
 
     try:
-        # Values automatically handled by the app
-        year_sold = 2013
-        lot_size = 5000.0
-        popular = 0
-        recession = 0
 
-        property_age = max(
-            year_sold - year_built,
-            0,
-        )
-
-        input_values = {
-            "year_sold": year_sold,
-            "property_tax": property_tax,
-            "insurance": insurance,
-            "beds": beds,
-            "baths": baths,
-            "sqft": sqft,
-            "year_built": year_built,
-            "lot_size": lot_size,
-            "basement": 1 if basement == "Yes" else 0,
-            "popular": popular,
-            "recession": recession,
-            "property_age": property_age,
-            "property_type_Condo": (
-                1 if property_type == "Condo" else 0
-            ),
+        user_data = {
+            "Gender": gender,
+            "Married": married,
+            "Dependents": dependents,
+            "Education": education,
+            "Self_Employed":
+                self_employed,
+            "ApplicantIncome":
+                applicant_income,
+            "CoapplicantIncome":
+                coapplicant_income,
+            "LoanAmount":
+                loan_amount,
+            "Loan_Amount_Term":
+                loan_term,
+            "Credit_History":
+                credit_history,
+            "Property_Area":
+                property_area,
         }
 
-        input_df = pd.DataFrame(
-            [input_values],
-            columns=FEATURE_COLUMNS,
+        input_df = prepare_user_input(
+            user_data,
+            model_columns,
         )
 
-        prediction = predict_property_price(
-            model,
-            input_df,
+        prediction, probability = (
+            predict_loan(
+                model,
+                scaler,
+                input_df,
+            )
         )
 
-        st.success(
-            f"Estimated Property Price: ${prediction:,.2f}"
-        )
+        st.divider()
+
+        if prediction == 1:
+
+            st.success(
+                "✅ Loan Application "
+                "Likely Approved"
+            )
+
+        else:
+
+            st.error(
+                "❌ Loan Application "
+                "Likely Not Approved"
+            )
+
+        if probability is not None:
+
+            st.metric(
+                "Approval Probability",
+                f"{probability:.1%}"
+            )
 
     except Exception as exc:
-        logger.exception("Prediction failed.")
-        st.error(f"Prediction failed: {exc}")
-        
-# --------------------------------------------------
-# MODEL VISUALIZATIONS
-# --------------------------------------------------
+
+        logger.exception(
+            "Streamlit prediction failed."
+        )
+
+        st.error(
+            f"Prediction could not be completed: {exc}"
+        )
+
+
+# ------------------------------------
+# Visualizations
+# ------------------------------------
 
 st.divider()
 
-st.subheader("📊 Model Visualizations")
-
-st.write(
-    "These visualizations show the performance of the "
-    "Real Estate prediction model."
+st.subheader(
+    "📊 Model Visualizations"
 )
 
-# Feature Importance
-st.markdown("### Feature Importance")
+
+st.markdown(
+    "### Loan Approval Distribution"
+)
 
 try:
+
     st.image(
-        "feature_importance.png",
-        caption="Random Forest Feature Importance",
+        "loan_distribution.png",
         use_container_width=True,
     )
+
 except Exception:
+
     st.info(
-        "Feature importance chart is not available. "
-        "Run `python main.py` to generate it."
+        "Run `python main.py` "
+        "to generate this chart."
     )
 
 
-# Actual vs Predicted
-st.markdown("### Actual vs Predicted Prices")
+st.markdown(
+    "### Model Accuracy Comparison"
+)
 
 try:
+
     st.image(
-        "actual_vs_predicted.png",
-        caption="Actual vs Predicted Property Prices",
+        "model_comparison.png",
         use_container_width=True,
     )
+
 except Exception:
+
     st.info(
-        "Actual vs Predicted chart is not available. "
-        "Run `python main.py` to generate it."
+        "Run `python main.py` "
+        "to generate this chart."
     )

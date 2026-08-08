@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -8,103 +7,131 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def plot_actual_vs_predicted(
-    y_test,
-    predictions,
-    output_path: str | Path = "actual_vs_predicted.png",
+def plot_loan_distribution(
+    df,
+    output_path="loan_distribution.png",
 ):
     """
-    Create and save an actual-versus-predicted scatter plot.
+    Plot approved vs denied loan applications.
     """
 
     try:
-        output_path = Path(output_path)
+        counts = df[
+            "Loan_Approved"
+        ].value_counts()
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-        ax.scatter(y_test, predictions, alpha=0.6)
-
-        minimum = min(y_test.min(), predictions.min())
-        maximum = max(y_test.max(), predictions.max())
-
-        ax.plot(
-            [minimum, maximum],
-            [minimum, maximum],
-            linestyle="--",
+        fig, ax = plt.subplots(
+            figsize=(7, 5)
         )
 
-        ax.set_title("Actual vs Predicted Property Prices")
-        ax.set_xlabel("Actual Price")
-        ax.set_ylabel("Predicted Price")
+        counts.plot(
+            kind="bar",
+            ax=ax
+        )
+
+        ax.set_title(
+            "Loan Approval Distribution"
+        )
+
+        ax.set_xlabel(
+            "Loan Status"
+        )
+
+        ax.set_ylabel(
+            "Number of Applications"
+        )
+
+        ax.tick_params(
+            axis="x",
+            rotation=0
+        )
 
         fig.tight_layout()
-        fig.savefig(output_path)
+
+        fig.savefig(
+            output_path
+        )
 
         plt.close(fig)
 
         logger.info(
-            "Actual-versus-predicted plot saved to %s",
-            output_path,
+            "Loan distribution chart saved."
         )
 
     except Exception as exc:
         logger.exception(
-            "Actual-versus-predicted visualization failed."
+            "Loan distribution visualization failed."
         )
 
         raise RuntimeError(
-            f"Unable to create prediction visualization: {exc}"
+            f"Unable to create chart: {exc}"
         ) from exc
 
 
-def plot_feature_importance(
-    model,
-    X: pd.DataFrame,
-    output_path: str | Path = "feature_importance.png",
+def plot_model_comparison(
+    results,
+    output_path="model_comparison.png",
 ):
     """
-    Create and save the Random Forest feature-importance chart.
+    Compare model accuracy.
     """
 
     try:
-        importance_df = pd.DataFrame(
+        result_df = pd.DataFrame(
             {
-                "Feature": X.columns,
-                "Importance": model.feature_importances_,
+                "Model": list(
+                    results.keys()
+                ),
+                "Accuracy": list(
+                    results.values()
+                ),
             }
-        ).sort_values(
-            by="Importance",
-            ascending=True,
         )
 
-        output_path = Path(output_path)
-
-        fig, ax = plt.subplots(figsize=(9, 7))
-
-        ax.barh(
-            importance_df["Feature"],
-            importance_df["Importance"],
+        fig, ax = plt.subplots(
+            figsize=(8, 5)
         )
 
-        ax.set_title("Real Estate Feature Importance")
-        ax.set_xlabel("Importance")
-        ax.set_ylabel("Feature")
+        ax.bar(
+            result_df["Model"],
+            result_df["Accuracy"]
+        )
+
+        ax.set_title(
+            "Model Accuracy Comparison"
+        )
+
+        ax.set_ylabel(
+            "Accuracy"
+        )
+
+        ax.set_ylim(
+            0,
+            1
+        )
+
+        ax.tick_params(
+            axis="x",
+            rotation=15
+        )
 
         fig.tight_layout()
-        fig.savefig(output_path)
+
+        fig.savefig(
+            output_path
+        )
 
         plt.close(fig)
 
         logger.info(
-            "Feature-importance chart saved to %s",
-            output_path,
+            "Model comparison chart saved."
         )
 
     except Exception as exc:
         logger.exception(
-            "Feature-importance visualization failed."
+            "Model comparison visualization failed."
         )
 
         raise RuntimeError(
-            f"Unable to create feature-importance chart: {exc}"
+            f"Unable to create model comparison: {exc}"
         ) from exc

@@ -3,97 +3,155 @@ import pickle
 from pathlib import Path
 
 import pandas as pd
-from sklearn.metrics import (
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score,
-)
 
 
 logger = logging.getLogger(__name__)
 
 
-def load_model(
-    model_path: str | Path = "models/RealEstateModel.pkl",
+def load_prediction_files(
+    model_path="models/LoanEligibilityModel.pkl",
+    scaler_path="models/scaler.pkl",
+    columns_path="models/model_columns.pkl",
 ):
     """
-    Load a trained real estate model from disk.
+    Load trained model, scaler and training columns.
     """
 
     try:
-        model_path = Path(model_path)
+        paths = [
+            model_path,
+            scaler_path,
+            columns_path,
+        ]
 
-        if not model_path.exists():
-            raise FileNotFoundError(
-                f"Model file was not found at: {model_path}"
-            )
+        for path in paths:
+            if not Path(path).exists():
+                raise FileNotFoundError(
+                    f"Required file missing: {path}"
+                )
 
-        with model_path.open("rb") as model_file:
-            model = pickle.load(model_file)
+        with open(
+            model_path,
+            "rb"
+        ) as file:
+            model = pickle.load(file)
 
-        logger.info("Model loaded from %s", model_path)
+        with open(
+            scaler_path,
+            "rb"
+        ) as file:
+            scaler = pickle.load(file)
 
-        return model
+        with open(
+            columns_path,
+            "rb"
+        ) as file:
+            model_columns = pickle.load(file)
+
+        return (
+            model,
+            scaler,
+            model_columns
+        )
 
     except Exception as exc:
-        logger.exception("Model loading failed.")
+        logger.exception(
+            "Prediction files could not be loaded."
+        )
 
         raise RuntimeError(
-            f"Unable to load the trained model: {exc}"
+            f"Unable to load prediction files: {exc}"
         ) from exc
 
 
-def evaluate_model(model, X_test, y_test) -> dict:
+def prepare_user_input(
+    user_data,
+    model_columns,
+):
     """
-    Evaluate the regression model using MAE, RMSE and R².
+    Convert Streamlit user input into the same
+    format used during training.
     """
 
     try:
-        predictions = model.predict(X_test)
+        df = pd.DataFrame(
+            [user_data]
+        )
 
-        mae = mean_absolute_error(y_test, predictions)
+        categorical_columns = [
+            "Gender",
+            "Married",
+            "Dependents",
+            "Education",
+            "Self_Employed",
+            "Property_Area",
+        ]
 
-        rmse = mean_squared_error(
-            y_test,
-            predictions,
-        ) ** 0.5
+        df = pd.get_dummies(
+            df,
+            columns=categorical_columns,
+            dtype=int
+        )
 
-        r2 = r2_score(y_test, predictions)
+        # Add missing dummy columns
+        for column in model_columns:
+            if column not in df.columns:
+                df[column] = 0
 
-        metrics = {
-            "mae": float(mae),
-            "rmse": float(rmse),
-            "r2": float(r2),
-        }
+        # Keep only training columns and correct order
+        df = df[model_columns]
 
-        logger.info("Model evaluation results: %s", metrics)
-
-        return metrics
+        return df
 
     except Exception as exc:
-        logger.exception("Model evaluation failed.")
+        logger.exception(
+            "User input preparation failed."
+        )
 
         raise RuntimeError(
-            f"Unable to evaluate the model: {exc}"
+            f"Unable to prepare user input: {exc}"
         ) from exc
 
 
-def predict_property_price(
+def predict_loan(
     model,
-    input_data: pd.DataFrame,
-) -> float:
+    scaler,
+    input_df,
+):
     """
-    Predict the price of one property.
+    Predict whether loan will be approved.
     """
 
     try:
-        prediction = model.predict(input_data)
+        scaled_input = scaler.transform(
+            input_df
+        )
 
-        return float(prediction[0])
+        prediction = model.predict(
+            scaled_input
+        )[0]
+
+        if hasattr(
+            model,
+            "predict_proba"
+        ):
+            probability = model.predict_proba(
+                scaled_input
+            )[0][1]
+
+        else:
+            probability = None
+
+        return (
+            int(prediction),
+            probability
+        )
 
     except Exception as exc:
-        logger.exception("Property-price prediction failed.")
+        logger.exception(
+            "Loan prediction failed."
+        )
 
         raise RuntimeError(
-            f"Unable to predict the property price: {exc}"
+            f"Prediction failed: {exc}"
         ) from exc

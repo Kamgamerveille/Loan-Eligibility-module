@@ -7,28 +7,9 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def load_and_preprocess_data(data_path: str | Path) -> pd.DataFrame:
+def load_and_clean_data(data_path):
     """
-    Load and perform basic preprocessing on the real estate dataset.
-
-    Parameters
-    ----------
-    data_path : str or Path
-        Location of the raw CSV dataset.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Cleaned real estate dataset.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the dataset does not exist.
-    ValueError
-        If the dataset is empty or does not contain the target column.
-    RuntimeError
-        If another data-loading error occurs.
+    Load and clean the raw loan eligibility dataset.
     """
 
     try:
@@ -36,51 +17,80 @@ def load_and_preprocess_data(data_path: str | Path) -> pd.DataFrame:
 
         if not data_path.exists():
             raise FileNotFoundError(
-                f"Dataset was not found at: {data_path}"
+                f"Dataset not found at: {data_path}"
             )
-
-        logger.info("Loading dataset from %s", data_path)
 
         df = pd.read_csv(data_path)
 
         if df.empty:
-            raise ValueError("The real estate dataset is empty.")
-
-        if "price" not in df.columns:
-            raise ValueError(
-                "The required target column 'price' is missing."
-            )
-
-        duplicate_count = df.duplicated().sum()
-
-        if duplicate_count > 0:
-            logger.info(
-                "Removing %s duplicate rows.",
-                duplicate_count
-            )
-            df = df.drop_duplicates()
-
-        numeric_columns = df.select_dtypes(include="number").columns
-
-        for column in numeric_columns:
-            if df[column].isna().any():
-                median_value = df[column].median()
-                df[column] = df[column].fillna(median_value)
+            raise ValueError("The dataset is empty.")
 
         logger.info(
             "Dataset loaded successfully with shape %s",
             df.shape
         )
 
+        # Convert these columns to categorical/object
+        df["Credit_History"] = df[
+            "Credit_History"
+        ].astype("object")
+
+        df["Loan_Amount_Term"] = df[
+            "Loan_Amount_Term"
+        ].astype("object")
+
+        # Fill missing categorical values
+        df["Gender"] = df["Gender"].fillna(
+            df["Gender"].mode()[0]
+        )
+
+        df["Married"] = df["Married"].fillna(
+            df["Married"].mode()[0]
+        )
+
+        df["Dependents"] = df["Dependents"].fillna(
+            df["Dependents"].mode()[0]
+        )
+
+        df["Self_Employed"] = df[
+            "Self_Employed"
+        ].fillna(
+            df["Self_Employed"].mode()[0]
+        )
+
+        df["Loan_Amount_Term"] = df[
+            "Loan_Amount_Term"
+        ].fillna(
+            df["Loan_Amount_Term"].mode()[0]
+        )
+
+        df["Credit_History"] = df[
+            "Credit_History"
+        ].fillna(
+            df["Credit_History"].mode()[0]
+        )
+
+        # Fill numerical missing value
+        df["LoanAmount"] = df[
+            "LoanAmount"
+        ].fillna(
+            df["LoanAmount"].median()
+        )
+
+        # Drop ID because it is not useful for prediction
+        if "Loan_ID" in df.columns:
+            df = df.drop("Loan_ID", axis=1)
+
+        logger.info(
+            "Data cleaning completed. Remaining missing values: %s",
+            df.isnull().sum().sum()
+        )
+
         return df
 
-    except (FileNotFoundError, ValueError):
-        logger.exception("Dataset validation failed.")
-        raise
-
     except Exception as exc:
-        logger.exception("Unexpected error while loading the dataset.")
+        logger.exception("Data loading/cleaning failed.")
 
         raise RuntimeError(
-            f"Unable to load and preprocess the dataset: {exc}"
+            f"Unable to prepare dataset: {exc}"
         ) from exc

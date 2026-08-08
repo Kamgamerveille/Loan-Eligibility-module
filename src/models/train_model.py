@@ -2,84 +2,167 @@ import logging
 import pickle
 from pathlib import Path
 
-import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.tree import DecisionTreeClassifier
 
 
 logger = logging.getLogger(__name__)
 
 
-def train_real_estate_model(
-    X: pd.DataFrame,
-    y: pd.Series,
-    model_path: str | Path = "models/RealEstateModel.pkl",
+def train_models(
+    X,
+    y,
+    model_path="models/LoanEligibilityModel.pkl",
+    scaler_path="models/scaler.pkl",
+    columns_path="models/model_columns.pkl",
 ):
     """
-    Split the data, train a Random Forest regression model,
-    and save the trained model.
+    Train Logistic Regression, Decision Tree,
+    and Random Forest models.
 
-    Parameters
-    ----------
-    X : pandas.DataFrame
-        Model input features.
-    y : pandas.Series
-        Property-price target.
-    model_path : str or Path
-        Location where the trained model will be stored.
-
-    Returns
-    -------
-    tuple
-        Trained model, X_train, X_test, y_train and y_test.
+    Select and save the best model.
     """
 
     try:
-        if X.empty or y.empty:
-            raise ValueError(
-                "Features and target must not be empty."
+        X_train, X_test, y_train, y_test = (
+            train_test_split(
+                X,
+                y,
+                test_size=0.20,
+                random_state=42,
+                stratify=y,
+            )
+        )
+
+        scaler = MinMaxScaler()
+
+        X_train_scaled = scaler.fit_transform(
+            X_train
+        )
+
+        X_test_scaled = scaler.transform(
+            X_test
+        )
+
+        models = {
+            "Logistic Regression":
+                LogisticRegression(
+                    max_iter=1000,
+                    random_state=42,
+                ),
+
+            "Decision Tree":
+                DecisionTreeClassifier(
+                    random_state=42
+                ),
+
+            "Random Forest":
+                RandomForestClassifier(
+                    n_estimators=100,
+                    random_state=42,
+                ),
+        }
+
+        results = {}
+
+        best_model = None
+        best_name = None
+        best_accuracy = 0
+
+        for name, model in models.items():
+
+            model.fit(
+                X_train_scaled,
+                y_train
             )
 
-        stratify_values = None
+            predictions = model.predict(
+                X_test_scaled
+            )
 
-        if "property_type_Condo" in X.columns:
-            stratify_values = X["property_type_Condo"]
+            accuracy = accuracy_score(
+                y_test,
+                predictions
+            )
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X,
-            y,
-            test_size=0.20,
-            random_state=42,
-            stratify=stratify_values,
+            results[name] = accuracy
+
+            logger.info(
+                "%s accuracy: %.4f",
+                name,
+                accuracy
+            )
+
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_model = model
+                best_name = name
+
+        # Create model directory
+        model_path = Path(model_path)
+
+        model_path.parent.mkdir(
+            parents=True,
+            exist_ok=True
         )
 
-        model = RandomForestRegressor(
-            n_estimators=200,
-            criterion="absolute_error",
-            random_state=42,
-            n_jobs=-1,
-        )
+        # Save best model
+        with open(
+            model_path,
+            "wb"
+        ) as model_file:
+            pickle.dump(
+                best_model,
+                model_file
+            )
 
-        logger.info("Training Random Forest Regressor.")
+        # Save scaler
+        with open(
+            scaler_path,
+            "wb"
+        ) as scaler_file:
+            pickle.dump(
+                scaler,
+                scaler_file
+            )
 
-        model.fit(X_train, y_train)
-
-        output_path = Path(model_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with output_path.open("wb") as model_file:
-            pickle.dump(model, model_file)
+        # Save exact columns used during training
+        with open(
+            columns_path,
+            "wb"
+        ) as columns_file:
+            pickle.dump(
+                list(X.columns),
+                columns_file
+            )
 
         logger.info(
-            "Trained model saved to %s",
-            output_path
+            "Best model: %s with accuracy %.4f",
+            best_name,
+            best_accuracy
         )
 
-        return model, X_train, X_test, y_train, y_test
+        return {
+            "model": best_model,
+            "model_name": best_name,
+            "accuracy": best_accuracy,
+            "results": results,
+            "X_train": X_train,
+            "X_test": X_test,
+            "y_train": y_train,
+            "y_test": y_test,
+            "X_test_scaled": X_test_scaled,
+        }
 
     except Exception as exc:
-        logger.exception("Model training failed.")
+        logger.exception(
+            "Model training failed."
+        )
 
         raise RuntimeError(
-            f"Unable to train the real estate model: {exc}"
+            f"Unable to train models: {exc}"
         ) from exc
