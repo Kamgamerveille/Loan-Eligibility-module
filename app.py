@@ -8,7 +8,6 @@ from src.models.predict_model import (
     predict_loan,
 )
 
-
 logging.basicConfig(
     level=logging.INFO,
     format=(
@@ -16,7 +15,6 @@ logging.basicConfig(
         "%(message)s"
     ),
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +25,7 @@ st.set_page_config(
     layout="centered",
 )
 
-
-st.title(
-    "💳 Loan Eligibility Predictor"
-)
+st.title("💳 Loan Eligibility Predictor")
 
 st.write(
     """
@@ -42,18 +37,13 @@ st.write(
 
 @st.cache_resource
 def load_files():
-
     return load_prediction_files()
 
 
 try:
-
-    model, scaler, model_columns = (
-        load_files()
-    )
+    model, scaler, model_columns = load_files()
 
 except Exception as exc:
-
     st.error(
         "The trained model could not be loaded. "
         "Run `python main.py` first."
@@ -63,12 +53,11 @@ except Exception as exc:
         "Model loading failed."
     )
 
+    st.exception(exc)
     st.stop()
 
 
-with st.form(
-    "loan_form"
-):
+with st.form("loan_form"):
 
     st.subheader(
         "Applicant Information"
@@ -171,36 +160,26 @@ with st.form(
         ],
     )
 
-    submitted = (
-        st.form_submit_button(
-            "Check Loan Eligibility"
-        )
+    submitted = st.form_submit_button(
+        "Check Loan Eligibility"
     )
 
 
 if submitted:
 
     try:
-
         user_data = {
             "Gender": gender,
             "Married": married,
             "Dependents": dependents,
             "Education": education,
-            "Self_Employed":
-                self_employed,
-            "ApplicantIncome":
-                applicant_income,
-            "CoapplicantIncome":
-                coapplicant_income,
-            "LoanAmount":
-                loan_amount,
-            "Loan_Amount_Term":
-                loan_term,
-            "Credit_History":
-                credit_history,
-            "Property_Area":
-                property_area,
+            "Self_Employed": self_employed,
+            "ApplicantIncome": applicant_income,
+            "CoapplicantIncome": coapplicant_income,
+            "LoanAmount": loan_amount,
+            "Loan_Amount_Term": loan_term,
+            "Credit_History": credit_history,
+            "Property_Area": property_area,
         }
 
         input_df = prepare_user_input(
@@ -208,39 +187,31 @@ if submitted:
             model_columns,
         )
 
-        prediction, probability = (
-            predict_loan(
-                model,
-                scaler,
-                input_df,
-            )
+        prediction, probability = predict_loan(
+            model,
+            scaler,
+            input_df,
         )
 
         st.divider()
 
         if prediction == 1:
-
             st.success(
-                "✅ Loan Application "
-                "Likely Approved"
+                "✅ Loan Application Likely Approved"
             )
 
         else:
-
             st.error(
-                "❌ Loan Application "
-                "Likely Not Approved"
+                "❌ Loan Application Likely Not Approved"
             )
 
         if probability is not None:
-
             st.metric(
                 "Approval Probability",
-                f"{probability:.1%}"
+                f"{probability:.1%}",
             )
 
     except Exception as exc:
-
         logger.exception(
             "Streamlit prediction failed."
         )
@@ -260,20 +231,17 @@ st.subheader(
     "📊 Model Visualizations"
 )
 
-
 st.markdown(
     "### Loan Approval Distribution"
 )
 
 try:
-
     st.image(
         "loan_distribution.png",
         use_container_width=True,
     )
 
 except Exception:
-
     st.info(
         "Run `python main.py` "
         "to generate this chart."
@@ -285,14 +253,12 @@ st.markdown(
 )
 
 try:
-
     st.image(
         "model_comparison.png",
         use_container_width=True,
     )
 
 except Exception:
-
     st.info(
         "Run `python main.py` "
         "to generate this chart."
